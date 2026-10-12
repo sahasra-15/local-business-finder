@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 
 let mongoMemoryServer = null;
 
@@ -22,6 +21,7 @@ export const connectDB = async () => {
       try {
         const fs = await import('fs');
         const path = await import('path');
+        const { MongoMemoryServer } = await import('mongodb-memory-server');
 
         const possibleBinaries = [
           path.resolve('node_modules/.cache/mongodb-memory-server/mongod-x64-win32-7.0.24.exe'),
