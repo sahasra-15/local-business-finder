@@ -3,6 +3,7 @@ import { Business } from '../models/Business.js';
 import { Review } from '../models/Review.js';
 import { Favorite } from '../models/Favorite.js';
 import { HYDERABAD_ADDITIONAL_BUSINESSES } from './hyderabadBusinessesData.js';
+import { getDiverseBusinessImages } from './categoryImages.js';
 
 export const runSeed = async (clearExisting = false) => {
   if (clearExisting) {
@@ -16,6 +17,14 @@ export const runSeed = async (clearExisting = false) => {
 
   const existingCount = await Business.countDocuments();
   if (existingCount >= 180 && !clearExisting) {
+    // Ensure all existing businesses have diverse category photos in DB
+    const businessesToUpdate = await Business.find({});
+    for (const doc of businessesToUpdate) {
+      if (!doc.images || doc.images.length <= 1 || doc.images[0].includes('photo-1517248135467')) {
+        const diverse = getDiverseBusinessImages(doc.category, doc.name);
+        await Business.updateOne({ _id: doc._id }, { $set: { images: diverse } });
+      }
+    }
     return; // Already fully populated
   }
 
@@ -1565,7 +1574,11 @@ export const runSeed = async (clearExisting = false) => {
 
   const insertedBusinesses = [];
   for (const b of allBusinessesToSeed) {
-    const doc = await Business.create(b);
+    const diverseImages = getDiverseBusinessImages(b.category, b.name);
+    const doc = await Business.create({
+      ...b,
+      images: diverseImages,
+    });
     insertedBusinesses.push(doc);
   }
 

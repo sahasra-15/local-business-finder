@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
 import EmptyState from '../../components/common/EmptyState';
+import { getBusinessDisplayImage, getCategoryFallbackImage } from '../../utils/categoryImages';
 
 export default function OwnerDashboardPage() {
   const { user } = useAuth();
@@ -97,11 +98,12 @@ export default function OwnerDashboardPage() {
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <img
-                          src={
-                            biz.images?.[0] ||
-                            'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=100'
-                          }
+                          src={getBusinessDisplayImage(biz)}
                           alt={biz.name}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = getCategoryFallbackImage(biz.category, biz.name);
+                          }}
                           className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200"
                         />
                         <div>

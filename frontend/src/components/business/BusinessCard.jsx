@@ -4,6 +4,7 @@ import { Heart, MapPin, Navigation, ExternalLink, Clock } from 'lucide-react';
 import RatingStars from '../common/RatingStars';
 import Badge from '../common/Badge';
 import { formatDistance, isBusinessOpenNow } from '../../utils/formatters';
+import { getBusinessDisplayImage, getCategoryFallbackImage } from '../../utils/categoryImages';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { favoriteService } from '../../services/favoriteService';
@@ -48,10 +49,7 @@ export default function BusinessCard({ business, initialIsFavorite = false, onFa
   const [lng, lat] = business.location?.coordinates || [78.567, 17.478];
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
-  const imageSrc =
-    business.images && business.images.length > 0
-      ? business.images[0]
-      : 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80';
+  const imageSrc = getBusinessDisplayImage(business);
 
   return (
     <div className="group bg-white rounded-2xl border border-slate-200 hover:border-slate-300 shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col h-full overflow-hidden">
@@ -63,8 +61,8 @@ export default function BusinessCard({ business, initialIsFavorite = false, onFa
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
           onError={(e) => {
-            e.target.src =
-              'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80';
+            e.target.onerror = null;
+            e.target.src = getCategoryFallbackImage(business.category, business.name);
           }}
         />
 

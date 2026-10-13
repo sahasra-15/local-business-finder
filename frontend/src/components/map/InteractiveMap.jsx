@@ -4,6 +4,7 @@ import L from 'leaflet';
 import { Link } from 'react-router-dom';
 import { Navigation, Star, MapPin, ExternalLink } from 'lucide-react';
 import { formatDistance } from '../../utils/formatters';
+import { getBusinessDisplayImage, getCategoryFallbackImage } from '../../utils/categoryImages';
 
 // Fix leaflet default icon issue in Vite
 const defaultIcon = L.icon({
@@ -112,13 +113,15 @@ export default function InteractiveMap({
             >
               <Popup className="custom-leaflet-popup">
                 <div className="w-56 p-1 text-slate-800">
-                  {b.images?.[0] && (
-                    <img
-                      src={b.images[0]}
-                      alt={b.name}
-                      className="w-full h-24 object-cover rounded-lg mb-2"
-                    />
-                  )}
+                  <img
+                    src={getBusinessDisplayImage(b)}
+                    alt={b.name}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = getCategoryFallbackImage(b.category, b.name);
+                    }}
+                    className="w-full h-24 object-cover rounded-lg mb-2"
+                  />
                   <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider block">
                     {b.category}
                   </span>

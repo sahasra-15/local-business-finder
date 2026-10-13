@@ -28,9 +28,9 @@ import ReviewCard from '../components/review/ReviewCard';
 import ReviewModal from '../components/review/ReviewModal';
 import InteractiveMap from '../components/map/InteractiveMap';
 import BusinessCard from '../components/business/BusinessCard';
-import { BusinessDetailSkeleton } from '../components/common/Skeleton';
 import Button from '../components/common/Button';
 import { addRecentlyViewed, getRecentlyViewed } from '../utils/recentViews';
+import { getBusinessDisplayImage, getCategoryFallbackImage, CATEGORY_IMAGE_POOLS } from '../utils/categoryImages';
 
 export default function BusinessDetailPage() {
   const { id } = useParams();
@@ -223,10 +223,16 @@ export default function BusinessDetailPage() {
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
   const openStatus = isBusinessOpenNow(business.openingHours);
 
+  const primaryImage = getBusinessDisplayImage(business);
+  const catKey = business.category;
+  const pool = CATEGORY_IMAGE_POOLS[catKey] || CATEGORY_IMAGE_POOLS['Other Local Businesses'] || [];
+  const galleryExtra = pool.filter((img) => img !== primaryImage).slice(0, 3);
   const images =
-    business.images && business.images.length > 0
+    business.images &&
+    business.images.length > 1 &&
+    !business.images[0].includes('photo-1517248135467')
       ? business.images
-      : ['https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop&q=80'];
+      : [primaryImage, ...galleryExtra];
 
   const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
@@ -346,6 +352,10 @@ export default function BusinessDetailPage() {
           <img
             src={images[activeImageIndex]}
             alt={business.name}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = getCategoryFallbackImage(business.category, business.name);
+            }}
             className="w-full h-full object-cover"
           />
         </div>
@@ -359,7 +369,15 @@ export default function BusinessDetailPage() {
                   activeImageIndex === idx ? 'border-teal-500 scale-105' : 'border-transparent opacity-70'
                 }`}
               >
-                <img src={img} alt="Thumbnail" className="w-full h-full object-cover" />
+                <img
+                  src={img}
+                  alt="Thumbnail"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = getCategoryFallbackImage(business.category, `${business.name}-${idx}`);
+                  }}
+                  className="w-full h-full object-cover"
+                />
               </button>
             ))}
           </div>
