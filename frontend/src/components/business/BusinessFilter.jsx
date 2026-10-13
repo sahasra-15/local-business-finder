@@ -1,5 +1,5 @@
-import { Search, Navigation, Filter, RotateCcw, LayoutGrid, List, MapPin } from 'lucide-react';
-import { CATEGORIES, CITIES_AND_REGIONS, ALL_LOCALITIES } from '../../utils/constants';
+import { Search, Navigation, Filter, RotateCcw, LayoutGrid, List, MapPin, Globe, Sparkles, CheckCircle2 } from 'lucide-react';
+import { CATEGORIES, CITIES_AND_REGIONS, ALL_LOCALITIES, HYDERABAD_ZONES } from '../../utils/constants';
 import Button from '../common/Button';
 import { useState } from 'react';
 
@@ -13,6 +13,9 @@ export default function BusinessFilter({
   isLocating,
   localityName,
   onGeocodeAddress,
+  onDiscoverLive,
+  isDiscovering,
+  livePlacesActive,
 }) {
   const [customSearch, setCustomSearch] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -102,11 +105,20 @@ export default function BusinessFilter({
                   onFilterChange('locality', e.target.value);
                 }
               }}
-              className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition cursor-pointer"
+              className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition cursor-pointer font-medium"
             >
-              <option value="">All Locations / Cities</option>
-              <option value="__custom__">🔍 Type Custom Location / City...</option>
-              {CITIES_AND_REGIONS.map((region) => (
+              <option value="">🌐 All Hyderabad (All Zones)</option>
+              <option value="__custom__">🔍 Type Custom Area / Pincode...</option>
+              {HYDERABAD_ZONES.map((zone) => (
+                <optgroup key={zone.name} label={zone.name}>
+                  {zone.localities.map((loc) => (
+                    <option key={`hyd-${loc.name}`} value={loc.name}>
+                      {loc.name} {loc.zone ? `(${loc.zone})` : ''} - {loc.pincode}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              {CITIES_AND_REGIONS.filter((r) => !r.city.includes('Hyderabad')).map((region) => (
                 <optgroup key={region.city} label={`📍 ${region.city}`}>
                   {region.localities.map((loc) => (
                     <option key={`${region.city}-${loc.name}`} value={loc.name}>
@@ -134,6 +146,38 @@ export default function BusinessFilter({
       {/* Advanced Filter Row */}
       <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-3">
+          {/* Live OpenStreetMap Discovery Action Button */}
+          {onDiscoverLive && (
+            <button
+              type="button"
+              onClick={onDiscoverLive}
+              disabled={isDiscovering}
+              title="Search genuine OpenStreetMap live places for the chosen location"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-xs cursor-pointer ${
+                livePlacesActive
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  : 'bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100'
+              }`}
+            >
+              <Globe className={`w-3.5 h-3.5 ${isDiscovering ? 'animate-spin text-emerald-600' : ''}`} />
+              <span>{isDiscovering ? 'Searching OSM...' : livePlacesActive ? 'Showing Live OSM Places' : 'Discover Real Places (OSM)'}</span>
+            </button>
+          )}
+
+          {/* Verified Only Toggle */}
+          <button
+            type="button"
+            onClick={() => onFilterChange('verified', filters.verified === 'true' ? '' : 'true')}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer ${
+              filters.verified === 'true'
+                ? 'bg-teal-600 text-white border-teal-600'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Verified Only</span>
+          </button>
+
           {/* Radius Filter */}
           <div className="flex items-center gap-1.5">
             <span className="text-slate-500 font-medium">Radius:</span>

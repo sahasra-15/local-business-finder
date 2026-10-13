@@ -8,6 +8,8 @@ import {
   deleteBusiness,
   getMyBusinesses,
   getCategories,
+  discoverLivePlaces,
+  importDiscoveredPlaces,
 } from '../controllers/businessController.js';
 import { protect, optionalAuth } from '../middleware/auth.js';
 import { authorize } from '../middleware/role.js';
@@ -22,9 +24,13 @@ const router = Router();
 // Public routes
 router.get('/categories', getCategories);
 router.get('/nearby', getNearbyBusinesses);
+router.get('/live-discover', discoverLivePlaces);
 router.get('/', optionalAuth, getBusinesses);
 router.get('/my-listings', protect, authorize('business_owner', 'admin'), getMyBusinesses);
 router.get('/:id', optionalAuth, getBusinessById);
+
+// Owner/Admin protected routes
+router.post('/import-places', protect, authorize('business_owner', 'admin'), importDiscoveredPlaces);
 
 // Owner/Admin protected routes
 router.post(

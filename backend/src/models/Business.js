@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 export const BUSINESS_CATEGORIES = [
+  // Core & Real-World Categories
   'Restaurants and Cafes',
   'Grocery Stores and Supermarkets',
   'Hospitals and Clinics',
@@ -15,6 +16,23 @@ export const BUSINESS_CATEGORIES = [
   'Fitness Centers and Gyms',
   'Professional Services',
   'Other Local Businesses',
+
+  // Expanded Real-World Categories
+  'Restaurants, Cafes & Food Outlets',
+  'Supermarkets & Grocery Stores',
+  'Hospitals, Clinics & Diagnostic Labs',
+  'Pharmacies & Medical Shops',
+  'Schools, Colleges & Training Institutes',
+  'IT Companies, Tech Firms & Coworking',
+  'Banks, ATMs & Financial Services',
+  'Salons, Spas & Beauty Parlours',
+  'Gyms, Fitness & Yoga Studios',
+  'Automobile Showrooms, Garages & Repair',
+  'Electronics, Mobile Stores & Computer Repair',
+  'Clothing, Fashion & Boutiques',
+  'Real Estate & Property Services',
+  'Courier, Printing & Stationery Services',
+  'Libraries & Bookshops',
 ];
 
 const dayHoursSchema = new mongoose.Schema(
@@ -136,6 +154,19 @@ const businessSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    source: {
+      type: String,
+      enum: ['osm', 'places', 'registered', 'demo'],
+      default: 'demo',
+    },
+    externalId: {
+      type: String,
+      default: null,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -145,6 +176,8 @@ const businessSchema = new mongoose.Schema(
 // GeoJSON 2dsphere index for location proximity queries
 businessSchema.index({ location: '2dsphere' });
 businessSchema.index({ category: 1, status: 1 });
+businessSchema.index({ externalId: 1 }, { sparse: true });
+businessSchema.index({ source: 1 });
 businessSchema.index({ owner: 1 });
 businessSchema.index({ name: 'text', description: 'text', 'address.locality': 'text' });
 

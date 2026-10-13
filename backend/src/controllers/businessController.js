@@ -3,6 +3,7 @@ import { Review } from '../models/Review.js';
 import { Favorite } from '../models/Favorite.js';
 import { successResponse, errorResponse } from '../utils/response.js';
 import { calculateDistance, formatDistance } from '../services/distanceService.js';
+import { fetchOsmPlaces, syncPlacesToDatabase, resolveLocalityCoords } from '../services/placesService.js';
 
 export const getBusinesses = async (req, res, next) => {
   try {
@@ -39,12 +40,20 @@ export const getBusinesses = async (req, res, next) => {
       query.category = category;
     }
 
-    // Locality or City filter
-    if (locality && locality.trim() && locality !== 'All' && locality !== 'All Locations') {
+    // Locality or City filter (supports "All", "All Locations", "All Hyderabad")
+    if (
+      locality &&
+      locality.trim() &&
+      locality !== 'All' &&
+      locality !== 'All Locations' &&
+      locality !== 'All Hyderabad' &&
+      locality !== 'All Hyderabad Localities'
+    ) {
       const locRegex = new RegExp(locality.trim(), 'i');
       const localityCondition = {
         $or: [
           { 'address.locality': locRegex },
+          { 'address.street': locRegex },
           { 'address.city': locRegex },
           { 'address.state': locRegex },
         ],
@@ -56,6 +65,14 @@ export const getBusinesses = async (req, res, next) => {
       } else {
         query.$or = localityCondition.$or;
       }
+    }
+
+    // Source / Verified filter
+    if (req.query.source) {
+      query.source = req.query.source;
+    }
+    if (req.query.verified === 'true') {
+      query.isVerified = true;
     }
 
     // Rating filter
@@ -353,6 +370,73 @@ export const getCategories = async (req, res, next) => {
     }));
 
     return successResponse(res, { categories: categoryList }, 'Categories retrieved');
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const discoverLivePlaces = async (req, res, next) => {
+  try {
+    const { locality, lat, lng, radius = 5, category, limit = 30 } = req.query;
+
+    let targetLat = lat ? parseFloat(lat) : null;
+    let targetLng = lng ? parseFloat(lng) : null;
+    let targetLocality = locality || 'Hyderabad';
+
+    // If locality provided without lat/lng, resolve via coordinates dictionary
+    if ((targetLat === null || targetLng === null) && locality) {
+      const resolved = resolveLocalityCoords(locality);
+      if (resolved) {
+        targetLat = resolved.lat;
+        targetLng = resolved.lng;
+        targetLocality = resolved.name;
+      } else {
+        targetLat = 17.4480;
+        targetLng = 78.3800;
+      }
+    } else if (targetLat === null || targetLng === null) {
+      targetLat = 17.4480;
+      targetLng = 78.3800;
+    }
+
+    const radiusMeters = (parseFloat(radius) || 5) * 1000;
+    const places = await fetchOsmPlaces({
+      lat: targetLat,
+      lng: targetLng,
+      radiusMeters,
+      category: category && category !== 'All' ? category : null,
+      limit: parseInt(limit, 10) || 30,
+      localityName: targetLocality,
+    });
+
+    return successResponse(
+      res,
+      {
+        places,
+        count: places.length,
+        center: { lat: targetLat, lng: targetLng, locality: targetLocality },
+        source: 'OpenStreetMap Overpass API (Live Real-World Data)',
+      },
+      `Discovered ${places.length} verified real places in ${targetLocality}`
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const importDiscoveredPlaces = async (req, res, next) => {
+  try {
+    const { places } = req.body;
+    if (!Array.isArray(places) || places.length === 0) {
+      return errorResponse(res, 'Array of places to import is required', 400);
+    }
+
+    const result = await syncPlacesToDatabase(places, req.user._id);
+    return successResponse(
+      res,
+      result,
+      `Successfully synced ${result.inserted} new places to directory (${result.updated} updated)`
+    );
   } catch (err) {
     next(err);
   }

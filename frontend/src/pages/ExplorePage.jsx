@@ -24,6 +24,7 @@ export default function ExplorePage() {
     minRating: searchParams.get('minRating') || '',
     priceRange: searchParams.get('priceRange') || '',
     sort: searchParams.get('sort') || 'nearest',
+    verified: searchParams.get('verified') || '',
   });
 
   const [page, setPage] = useState(parseInt(searchParams.get('page') || '1', 10));
@@ -33,6 +34,8 @@ export default function ExplorePage() {
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalCount: 0 });
   const [loading, setLoading] = useState(true);
   const [selectedMapBusiness, setSelectedMapBusiness] = useState(null);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [livePlacesActive, setLivePlacesActive] = useState(false);
 
   // Sync state changes to searchParams
   useEffect(() => {
@@ -44,6 +47,7 @@ export default function ExplorePage() {
     if (filters.minRating) params.set('minRating', filters.minRating);
     if (filters.priceRange) params.set('priceRange', filters.priceRange);
     if (filters.sort) params.set('sort', filters.sort);
+    if (filters.verified) params.set('verified', filters.verified);
     if (page > 1) params.set('page', page.toString());
     setSearchParams(params, { replace: true });
   }, [filters, page, setSearchParams]);
@@ -52,6 +56,7 @@ export default function ExplorePage() {
   useEffect(() => {
     const fetchBusinesses = async () => {
       setLoading(true);
+      setLivePlacesActive(false);
       try {
         const queryParams = {
           search: filters.search,
@@ -61,6 +66,7 @@ export default function ExplorePage() {
           minRating: filters.minRating,
           priceRange: filters.priceRange,
           sort: filters.sort,
+          verified: filters.verified,
           page,
           limit: 12,
           lat: coordinates.lat,
@@ -99,8 +105,41 @@ export default function ExplorePage() {
       minRating: '',
       priceRange: '',
       sort: 'nearest',
+      verified: '',
     });
+    setLivePlacesActive(false);
     setPage(1);
+  };
+
+  const handleDiscoverLivePlaces = async () => {
+    setIsDiscovering(true);
+    try {
+      const res = await businessService.discoverLivePlaces({
+        locality: filters.locality || localityName || 'Hyderabad',
+        category: filters.category !== 'All' ? filters.category : undefined,
+        lat: coordinates?.lat,
+        lng: coordinates?.lng,
+        radius: filters.radius || 5,
+        limit: 30,
+      });
+
+      const livePlaces = res.data?.places || [];
+      if (livePlaces.length > 0) {
+        setBusinesses(livePlaces);
+        setLivePlacesActive(true);
+        setPagination({
+          currentPage: 1,
+          totalPages: 1,
+          totalCount: livePlaces.length,
+        });
+      } else {
+        alert('No additional real-world places found for this search radius in OpenStreetMap.');
+      }
+    } catch (err) {
+      console.error('Failed to discover live OSM places:', err);
+    } finally {
+      setIsDiscovering(false);
+    }
   };
 
   return (
@@ -151,7 +190,28 @@ export default function ExplorePage() {
         isLocating={isLocating}
         localityName={localityName}
         onGeocodeAddress={geocodeAddress}
+        onDiscoverLive={handleDiscoverLivePlaces}
+        isDiscovering={isDiscovering}
+        livePlacesActive={livePlacesActive}
       />
+
+      {/* Live OSM Discovery Active Banner */}
+      {livePlacesActive && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>
+              <strong>Live OpenStreetMap Discovery:</strong> Showing {businesses.length} genuine real-world places around <strong>{localityName}</strong>.
+            </span>
+          </div>
+          <button
+            onClick={handleResetFilters}
+            className="font-bold underline hover:text-emerald-950 cursor-pointer text-left sm:text-right"
+          >
+            Back to Directory Listings ↺
+          </button>
+        </div>
+      )}
 
       {/* Results Header */}
       <div className="flex items-center justify-between text-xs text-slate-500 px-1">
@@ -193,25 +253,24 @@ export default function ExplorePage() {
                 No Businesses Found Within {filters.radius} km
               </h3>
               <p className="text-sm text-slate-500 max-w-md mx-auto">
-                No listings matched your current filters near <span className="font-semibold text-slate-700">{localityName}</span>. Try widening your distance radius or clearing category and search keywords.
+                No listings matched your current filters near <span className="font-semibold text-slate-700">{localityName}</span>. You can search live OpenStreetMap real places or expand your distance radius.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <Button
+                  variant="teal"
+                  size="sm"
+                  onClick={handleDiscoverLivePlaces}
+                  disabled={isDiscovering}
+                >
+                  {isDiscovering ? 'Searching OSM...' : '🌐 Discover Real Places in this Area'}
+                </Button>
                 {parseInt(filters.radius, 10) < 25 && (
                   <Button
-                    variant="teal"
+                    variant="outline"
                     size="sm"
                     onClick={() => handleFilterChange('radius', '25')}
                   >
                     Expand Radius to 25 km
-                  </Button>
-                )}
-                {parseInt(filters.radius, 10) >= 25 && (
-                  <Button
-                    variant="teal"
-                    size="sm"
-                    onClick={() => handleFilterChange('radius', '50')}
-                  >
-                    Expand Radius to 50 km
                   </Button>
                 )}
                 <Button variant="outline" size="sm" onClick={handleResetFilters}>

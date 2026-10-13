@@ -9,4 +9,7 @@ export const businessService = {
   createBusiness: (data) => api.post('/businesses', data),
   updateBusiness: (id, data) => api.put(`/businesses/${id}`, data),
   deleteBusiness: (id) => api.delete(`/businesses/${id}`),
+  discoverLivePlaces: (params = {}) => api.get('/businesses/live-discover', { params }),
+  importPlaces: (places) => api.post('/businesses/import-places', { places }),
 };
+

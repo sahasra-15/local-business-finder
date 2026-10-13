@@ -117,9 +117,9 @@ export default function HomePage() {
           </h1>
 
           <p className="max-w-2xl mx-auto text-base sm:text-lg text-slate-300 font-normal leading-relaxed">
-            Find authentic dining spots, organic groceries, multi-specialty clinics, diagnostic labs,
-            salons, and trusted services across Banjara Hills, Jubilee Hills, Hitec City, Gachibowli,
-            Secunderabad, Charminar, Bengaluru, Mumbai, and beyond.
+            Find authentic dining spots, supermarkets, multi-specialty clinics, diagnostic labs,
+            IT offices, schools, and trusted local services across Kandlakoya, Medchal, Kompally,
+            HITEC City, Gachibowli, Secunderabad, and all Hyderabad localities.
           </p>
 
           {/* Large Hero Search Box */}
@@ -135,7 +135,7 @@ export default function HomePage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Business name, cuisine, service..."
+                  placeholder="Business name, cuisine, IT firm, clinic, service..."
                   className="w-full text-sm font-medium bg-transparent focus:outline-none placeholder-slate-400 text-slate-800"
                 />
               </div>
@@ -189,15 +189,16 @@ export default function HomePage() {
           <div className="pt-2 flex flex-wrap items-center justify-center gap-2 text-xs">
             <span className="text-slate-400 font-medium">Popular hubs:</span>
             {[
-              'Banjara Hills',
-              'Jubilee Hills',
-              'Hitec City',
+              'Kandlakoya',
+              'Medchal Town',
+              'Kompally',
+              'Suchitra',
+              'HITEC City',
               'Gachibowli',
-              'Charminar (Old City)',
-              'ECIL',
-              'Indiranagar',
-              'Bandra West',
-              'Connaught Place',
+              'Kukatpally',
+              'Secunderabad',
+              'Uppal',
+              'Mehdipatnam',
             ].map((locName) => (
               <button
                 key={locName}
@@ -206,9 +207,9 @@ export default function HomePage() {
                   selectLocality(locName);
                   navigate(`/explore?locality=${encodeURIComponent(locName)}`);
                 }}
-                className="px-3 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition cursor-pointer"
+                className="px-3 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition cursor-pointer font-medium"
               >
-                {locName}
+                📍 {locName}
               </button>
             ))}
           </div>

@@ -122,7 +122,7 @@ export default function BusinessCard({ business, initialIsFavorite = false, onFa
       {/* Content */}
       <div className="p-5 flex-1 flex flex-col justify-between">
         <div className="space-y-2">
-          {/* Rating */}
+          {/* Rating & Locality */}
           <div className="flex items-center justify-between">
             <RatingStars
               rating={business.averageRating || 0}
@@ -134,13 +134,34 @@ export default function BusinessCard({ business, initialIsFavorite = false, onFa
             </span>
           </div>
 
-          {/* Business Title */}
-          <Link
-            to={`/business/${business._id}`}
-            className="block text-base font-bold text-slate-900 group-hover:text-teal-600 transition-colors line-clamp-1"
-          >
-            {business.name}
-          </Link>
+          {/* Business Title & Verification Badge */}
+          <div className="flex items-start justify-between gap-1.5 pt-0.5">
+            <Link
+              to={`/business/${business._id}`}
+              className="block text-base font-bold text-slate-900 group-hover:text-teal-600 transition-colors line-clamp-1 flex-1"
+            >
+              {business.name}
+            </Link>
+          </div>
+
+          {/* Data Source Indicator */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {business.source === 'osm' || business.isVerified ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Verified Place (OSM)
+              </span>
+            ) : business.source === 'registered' ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                Registered Business
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium">
+                Demo Listing
+              </span>
+            )}
+          </div>
 
           {/* Locality & Address */}
           <p className="text-xs text-slate-500 flex items-center gap-1 line-clamp-1">
