@@ -2,18 +2,34 @@
 
 A full-stack, commercial-grade web application built with **Node.js, Express, MongoDB (Mongoose), React (Vite), Tailwind CSS, Leaflet, and OpenStreetMap**.
 
-The platform enables users in Hyderabad, Telangana (covering localities like **ECIL, AS Rao Nagar, Sainikpuri, Nagaram, Tarnaka, Kushaiguda, and Malkajgiri**) to discover nearby businesses, inspect interactive maps, filter by distance radius, explore categorized services, write reviews, and save favorites. It includes dedicated dashboards for **Business Owners** and **System Administrators**.
+The platform provides extensive coverage across **Medchal, Kandlakoya (including Kandlakoya IT Park), North Hyderabad, Cyberabad / West Hyderabad, Central Hyderabad & Secunderabad, East Hyderabad, and South Hyderabad**, empowering users to discover genuine local businesses, inspect interactive maps, filter by distance radius, explore categorized services, write reviews, and save favorites.
 
 ---
 
 ## 🌟 Key Features
 
-### 1. Location-Aware Geospatial Search
+### 1. Extensive Hyderabad & Telangana Locality Coverage
+- **🌟 Medchal & Kandlakoya Region**: Kandlakoya, Kandlakoya IT Park, Medchal Town, Medchal Checkpost, Medchal Railway Station Road, Gundlapochampally.
+- **📍 North Hyderabad**: Kompally, Suchitra, Jeedimetla, Quthbullapur, Alwal, Bowenpally.
+- **📍 West Hyderabad & Cyberabad**: HITEC City, Madhapur, Gachibowli, Kondapur, Kukatpally, KPHB, Miyapur, Hafeezpet, Nallagandla, Jubilee Hills, Banjara Hills.
+- **📍 Central Hyderabad & Secunderabad**: Secunderabad, Paradise, Begumpet, Ameerpet, Himayatnagar, Abids, Koti, Somajiguda, Panjagutta.
+- **📍 East Hyderabad**: Uppal, Habsiguda, Tarnaka, Nacharam, Mallapur, LB Nagar, Nagole, ECIL, AS Rao Nagar, Sainikpuri, Malkajgiri.
+- **📍 South Hyderabad**: Dilsukhnagar, Malakpet, Mehdipatnam, Tolichowki, Attapur, Rajendranagar, Shamshabad (Airport Zone), Charminar (Old City).
+
+### 2. Real-World Business Discovery via OpenStreetMap (OSM)
+- **Live Overpass API Integration**: Real-time querying of genuine physical businesses, amenities, colleges, banks, supermarkets, and healthcare facilities with verified coordinates.
+- **Transparent Verification Badging**:
+  - `Verified Place (OSM)` for genuine OpenStreetMap listings.
+  - `Registered Business` for local merchant accounts registered on the platform.
+  - `Demo Listing` for sample entries.
+- **No Fabricated Information**: Businesses without user reviews honestly state *"No reviews yet"* instead of arbitrary fake ratings. Genuine addresses, phone contacts, and direct driving directions are provided.
+
+### 3. Location-Aware Geospatial Search
 - **Browser Geolocation API**: Explicit user permission request with fallback handling.
 - **MongoDB 2dsphere Indexes**: High-performance spherical queries using `$geoNear` / GeoJSON Point format.
 - **Distance Calculations**: Haversine formula calculates real distance in kilometers and meters.
 - **Radius Filters**: Filter businesses within 1 km, 5 km, 10 km, and 25 km.
-- **Localities Quick Jump**: Instant filtering across Hyderabad localities (ECIL, AS Rao Nagar, Sainikpuri, Tarnaka, Nagaram, etc.).
+- **Zone-Grouped Locality Dropdown**: Effortlessly jump between all 6 Hyderabad zones or search "All Hyderabad".
 
 ### 2. Interactive Leaflet & OpenStreetMap Maps
 - Real-time markers synchronized with active search filters and keywords.
