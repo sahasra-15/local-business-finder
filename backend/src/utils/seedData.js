@@ -15,8 +15,18 @@ export const runSeed = async (clearExisting = false) => {
   }
 
   const existingCount = await Business.countDocuments();
-  if (existingCount > 0 && !clearExisting) {
-    return; // Already populated
+  if (existingCount >= 180 && !clearExisting) {
+    return; // Already fully populated
+  }
+
+  if (existingCount > 0 && existingCount < 180) {
+    console.log(`[Seed] Upgrading database from ${existingCount} to full comprehensive directory with reviews...`);
+    await Promise.all([
+      User.deleteMany({}),
+      Business.deleteMany({}),
+      Review.deleteMany({}),
+      Favorite.deleteMany({}),
+    ]);
   }
 
   console.log('[Seed] Populating rich demonstration records across all Hyderabad zones & metros (55+ businesses)...');
