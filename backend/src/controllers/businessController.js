@@ -113,13 +113,21 @@ export const getBusinesses = async (req, res, next) => {
       .limit(limitNum)
       .lean();
 
-    // Attach distances if coordinates provided
-    const userLat = lat ? parseFloat(lat) : null;
-    const userLng = lng ? parseFloat(lng) : null;
+    // Attach distances if coordinates provided or resolved from locality
+    let userLat = lat ? parseFloat(lat) : null;
+    let userLng = lng ? parseFloat(lng) : null;
+
+    if ((userLat === null || userLng === null) && locality) {
+      const resolved = resolveLocalityCoords(locality);
+      if (resolved) {
+        userLat = resolved.lat;
+        userLng = resolved.lng;
+      }
+    }
 
     if (userLat !== null && userLng !== null && !isNaN(userLat) && !isNaN(userLng)) {
       businesses = businesses.map((b) => {
-        const [bLng, bLat] = b.location.coordinates;
+        const [bLng, bLat] = b.location?.coordinates || [78.4878, 17.5878];
         const dist = calculateDistance(userLat, userLng, bLat, bLng);
         return {
           ...b,
@@ -127,6 +135,35 @@ export const getBusinesses = async (req, res, next) => {
           distanceFormatted: formatDistance(dist),
         };
       });
+
+      // If user selected a specific locality and fewer than 4 businesses matched exactly,
+      // expand search to nearby businesses within 15km in the same region
+      if (locality && businesses.length < 4) {
+        const existingIds = new Set(businesses.map((b) => b._id.toString()));
+        const nearbyQuery = {
+          status: 'approved',
+          _id: { $nin: Array.from(existingIds) },
+        };
+        if (category && category !== 'All' && category !== 'all') {
+          nearbyQuery.category = category;
+        }
+        const nearbyPool = await Business.find(nearbyQuery).limit(40).lean();
+        const nearbyCandidates = nearbyPool
+          .map((b) => {
+            const [bLng, bLat] = b.location?.coordinates || [78.4878, 17.5878];
+            const dist = calculateDistance(userLat, userLng, bLat, bLng);
+            return {
+              ...b,
+              distance: dist,
+              distanceFormatted: formatDistance(dist),
+            };
+          })
+          .filter((b) => b.distance <= 15) // within 15 km of that locality
+          .sort((a, b) => a.distance - b.distance);
+
+        const needed = 8 - businesses.length;
+        businesses = [...businesses, ...nearbyCandidates.slice(0, needed)];
+      }
 
       if (sort === 'nearest') {
         businesses.sort((a, b) => (a.distance ?? 999999) - (b.distance ?? 999999));

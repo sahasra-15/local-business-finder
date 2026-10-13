@@ -2,6 +2,7 @@ import { User } from '../models/User.js';
 import { Business } from '../models/Business.js';
 import { Review } from '../models/Review.js';
 import { Favorite } from '../models/Favorite.js';
+import { HYDERABAD_ADDITIONAL_BUSINESSES } from './hyderabadBusinessesData.js';
 
 export const runSeed = async (clearExisting = false) => {
   if (clearExisting) {
@@ -1544,8 +1545,16 @@ export const runSeed = async (clearExisting = false) => {
     },
   ];
 
+  const allBusinessesToSeed = [
+    ...rawBusinesses,
+    ...HYDERABAD_ADDITIONAL_BUSINESSES.map((b, idx) => ({
+      ...b,
+      owner: idx % 2 === 0 ? owner1._id : owner2._id,
+    })),
+  ];
+
   const insertedBusinesses = [];
-  for (const b of rawBusinesses) {
+  for (const b of allBusinessesToSeed) {
     const doc = await Business.create(b);
     insertedBusinesses.push(doc);
   }
@@ -1984,7 +1993,44 @@ export const runSeed = async (clearExisting = false) => {
   ];
 
   for (const r of reviewsData) {
-    await Review.create(r);
+    try {
+      await Review.create(r);
+    } catch (err) {
+      // Ignore duplicate
+    }
+  }
+
+  // Comprehensive review coverage: Ensure EVERY business receives authentic reviews and realistic 4.2-4.9 star ratings
+  const allUsers = [user1, user2, user3, user4, user5];
+  const dynamicReviewTemplates = [
+    { rating: 5, text: (name, loc) => `Outstanding experience at ${name}! Truly one of the best in ${loc}. Very attentive staff and great quality.` },
+    { rating: 5, text: (name, loc) => `Highly recommend ${name} in ${loc}. Extremely clean, well-managed, and reliable service. 5 stars!` },
+    { rating: 4, text: (name, loc) => `Great quality and very convenient location right in ${loc}. Quick response time and professional service.` },
+    { rating: 5, text: (name, loc) => `Exceptional attention to detail. ${name} exceeded our expectations. A wonderful local establishment!` },
+    { rating: 4, text: (name, loc) => `Prompt service and transparent pricing. Very satisfied with our visit to ${name} in ${loc}.` },
+    { rating: 5, text: (name, loc) => `Top-notch quality and friendly customer care. Very glad to have ${name} right here in ${loc}!` },
+  ];
+
+  for (let i = 0; i < insertedBusinesses.length; i++) {
+    const b = insertedBusinesses[i];
+    const existingCount = await Review.countDocuments({ business: b._id });
+    if (existingCount >= 2) continue; // Already covered by specific reviews
+
+    const needed = 2 + (i % 2); // 2 or 3 reviews
+    for (let uIdx = 0; uIdx < needed; uIdx++) {
+      const userDoc = allUsers[(i + uIdx) % allUsers.length];
+      const tmpl = dynamicReviewTemplates[(i * 2 + uIdx) % dynamicReviewTemplates.length];
+      try {
+        await Review.create({
+          user: userDoc._id,
+          business: b._id,
+          rating: tmpl.rating,
+          reviewText: `[Demonstration Review] ${tmpl.text(b.name, b.address?.locality || 'Hyderabad')}`,
+        });
+      } catch (err) {
+        // Skip duplicate unique index constraint if user already reviewed
+      }
+    }
   }
 
   // Ensure all businesses recalculate ratings dynamically from stored reviews
