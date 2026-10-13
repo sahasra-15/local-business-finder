@@ -35,9 +35,35 @@ export const getBusinesses = async (req, res, next) => {
       ];
     }
 
-    // Category filter
+    // Category filter with bidirectional alias matching
     if (category && category !== 'All' && category !== 'all') {
-      query.category = category;
+      const CATEGORY_ALIASES = {
+        'Supermarkets & Grocery Stores': ['Supermarkets & Grocery Stores', 'Grocery Stores and Supermarkets'],
+        'Grocery Stores and Supermarkets': ['Supermarkets & Grocery Stores', 'Grocery Stores and Supermarkets'],
+        'Restaurants, Cafes & Food Outlets': ['Restaurants, Cafes & Food Outlets', 'Restaurants and Cafes'],
+        'Restaurants and Cafes': ['Restaurants, Cafes & Food Outlets', 'Restaurants and Cafes'],
+        'Hospitals, Clinics & Diagnostic Labs': ['Hospitals, Clinics & Diagnostic Labs', 'Hospitals and Clinics'],
+        'Hospitals and Clinics': ['Hospitals, Clinics & Diagnostic Labs', 'Hospitals and Clinics'],
+        'Pharmacies & Medical Shops': ['Pharmacies & Medical Shops', 'Pharmacies'],
+        'Pharmacies': ['Pharmacies & Medical Shops', 'Pharmacies'],
+        'Schools, Colleges & Training Institutes': ['Schools, Colleges & Training Institutes', 'Educational Institutes and Coaching Centers'],
+        'Educational Institutes and Coaching Centers': ['Schools, Colleges & Training Institutes', 'Educational Institutes and Coaching Centers'],
+        'Gyms, Fitness & Yoga Studios': ['Gyms, Fitness & Yoga Studios', 'Fitness Centers and Gyms'],
+        'Fitness Centers and Gyms': ['Gyms, Fitness & Yoga Studios', 'Fitness Centers and Gyms'],
+        'Salons, Spas & Beauty Parlours': ['Salons, Spas & Beauty Parlours', 'Salons and Beauty Services'],
+        'Salons and Beauty Services': ['Salons, Spas & Beauty Parlours', 'Salons and Beauty Services'],
+        'Automobile Showrooms, Garages & Repair': ['Automobile Showrooms, Garages & Repair', 'Automobile Repair'],
+        'Automobile Repair': ['Automobile Showrooms, Garages & Repair', 'Automobile Repair'],
+        'Electronics, Mobile Stores & Computer Repair': ['Electronics, Mobile Stores & Computer Repair', 'Electronics and Mobile Repair'],
+        'Electronics and Mobile Repair': ['Electronics, Mobile Stores & Computer Repair', 'Electronics and Mobile Repair'],
+        'Clothing, Fashion & Boutiques': ['Clothing, Fashion & Boutiques', 'Clothing and Fashion'],
+        'Clothing and Fashion': ['Clothing, Fashion & Boutiques', 'Clothing and Fashion'],
+        'IT Companies, Tech Firms & Coworking': ['IT Companies, Tech Firms & Coworking', 'Professional Services'],
+        'Professional Services': ['IT Companies, Tech Firms & Coworking', 'Professional Services'],
+      };
+
+      const matchedCategories = CATEGORY_ALIASES[category] || [category];
+      query.category = { $in: matchedCategories };
     }
 
     // Locality or City filter (supports "All", "All Locations", "All Hyderabad")
@@ -47,7 +73,9 @@ export const getBusinesses = async (req, res, next) => {
       locality !== 'All' &&
       locality !== 'All Locations' &&
       locality !== 'All Hyderabad' &&
-      locality !== 'All Hyderabad Localities'
+      locality !== 'All Hyderabad Localities' &&
+      locality !== 'All Hyderabad (All Zones)' &&
+      locality !== 'All Zones'
     ) {
       const locRegex = new RegExp(locality.trim(), 'i');
       const localityCondition = {
