@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Navigation, Layers, X, ArrowRight, Star } from 'lucide-react';
 import { businessService } from '../services/businessService';
 import { useLocation } from '../context/LocationContext';
-import { CATEGORIES, CITIES_AND_REGIONS } from '../utils/constants';
+import { PRIMARY_CATEGORIES, CITIES_AND_REGIONS } from '../utils/constants';
 import InteractiveMap from '../components/map/InteractiveMap';
 import BusinessCard from '../components/business/BusinessCard';
 
@@ -12,30 +12,48 @@ export default function MapViewPage() {
   const [businesses, setBusinesses] = useState([]);
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [loading, setLoading] = useState(true);
+  const activeReqRef = useRef(0);
+
+  // Debounce search input by 250ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
+    const reqId = ++activeReqRef.current;
     const fetchMapBusinesses = async () => {
       setLoading(true);
       try {
         const res = await businessService.getBusinesses({
-          search,
+          search: debouncedSearch,
           category: category === 'All' ? undefined : category,
-          limit: 40,
+          limit: 50,
           lat: coordinates.lat,
           lng: coordinates.lng,
         });
-        setBusinesses(res.data.businesses || []);
+        if (reqId === activeReqRef.current) {
+          setBusinesses(res.data.businesses || []);
+        }
       } catch (err) {
-        console.error('Error fetching map businesses:', err);
+        if (reqId === activeReqRef.current) {
+          console.error('Error fetching map businesses:', err);
+          setBusinesses([]);
+        }
       } finally {
-        setLoading(false);
+        if (reqId === activeReqRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     fetchMapBusinesses();
-  }, [search, category, coordinates]);
+  }, [debouncedSearch, category, coordinates]);
 
   return (
     <div className="relative h-[calc(100vh-4.5rem)] w-full overflow-hidden flex flex-col">
@@ -62,7 +80,7 @@ export default function MapViewPage() {
               className="w-full px-3 py-2 bg-slate-50 rounded-xl text-xs font-medium border border-slate-200 text-slate-700 focus:outline-none focus:border-teal-500 cursor-pointer"
             >
               <option value="All">All Categories</option>
-              {CATEGORIES.map((cat) => (
+              {PRIMARY_CATEGORIES.map((cat) => (
                 <option key={cat.name} value={cat.name}>
                   {cat.name}
                 </option>

@@ -246,8 +246,9 @@ export function resolveLocalityCoords(localityName) {
 /**
  * Fetches real places from OpenStreetMap Overpass API
  */
-export async function fetchOsmPlaces({ lat, lng, radiusMeters = 5000, category = null, limit = 30, localityName = 'Hyderabad' }) {
-  const cacheKey = `${lat.toFixed(3)}_${lng.toFixed(3)}_${radiusMeters}_${category || 'all'}`;
+export async function fetchOsmPlaces({ lat, lng, radiusMeters = 5000, category = null, search = null, limit = 30, localityName = 'Hyderabad' }) {
+  const searchKey = search ? search.trim().toLowerCase() : '';
+  const cacheKey = `${lat.toFixed(3)}_${lng.toFixed(3)}_${radiusMeters}_${category || 'all'}_${searchKey}`;
   const now = Date.now();
 
   if (cache.has(cacheKey)) {
@@ -322,25 +323,37 @@ export async function fetchOsmPlaces({ lat, lng, radiusMeters = 5000, category =
       continue; // Filter by category if requested
     }
 
-    const dist = calculateDistance(lat, lng, elLat, elLng);
-    const street = tags['addr:street'] || tags['addr:full'] || `Main Road, Near ${localityName}`;
+    const street = tags['addr:street'] || tags['addr:full'] || (tags['addr:housenumber'] ? `${tags['addr:housenumber']} ${tags['addr:street'] || ''}`.trim() : '');
     const suburb = tags['addr:suburb'] || tags['addr:district'] || localityName;
-    const postcode = tags['addr:postcode'] || '501401';
 
-    const images = CATEGORY_IMAGES[mappedCat] || CATEGORY_IMAGES.default;
+    // Apply text search filter if user entered query
+    if (search && search.trim()) {
+      const s = search.trim().toLowerCase();
+      const match =
+        lowerName.includes(s) ||
+        mappedCat.toLowerCase().includes(s) ||
+        suburb.toLowerCase().includes(s) ||
+        street.toLowerCase().includes(s);
+      if (!match) continue;
+    }
+
+    const dist = calculateDistance(lat, lng, elLat, elLng);
+    const postcode = tags['addr:postcode'] || null;
+
+    const images = CATEGORY_IMAGES[mappedCat] || CATEGORY_IMAGES['Other Local Businesses'] || [];
 
     formatted.push({
       _id: `osm_${el.type}_${el.id}`,
       externalId: `osm:${el.type}:${el.id}`,
       name,
-      description: `Verified ${mappedCat.toLowerCase()} located in ${suburb}, Hyderabad. Real-world landmark sourced directly from OpenStreetMap.`,
+      description: tags.description || `Real-world ${mappedCat.toLowerCase()} located in ${suburb}, Hyderabad (sourced via OpenStreetMap).`,
       category: mappedCat,
       address: {
-        street,
+        street: street || `Near ${localityName}`,
         locality: suburb,
         city: 'Hyderabad',
         state: 'Telangana',
-        postalCode: postcode,
+        postalCode: postcode || '',
         country: 'India',
       },
       location: {
@@ -348,18 +361,18 @@ export async function fetchOsmPlaces({ lat, lng, radiusMeters = 5000, category =
         coordinates: [elLng, elLat],
       },
       contact: {
-        phone: tags['contact:phone'] || tags['phone'] || '+91 40 2300 0000',
-        website: tags['contact:website'] || tags['website'] || '',
-        email: tags['contact:email'] || tags['email'] || '',
+        phone: tags['contact:phone'] || tags['phone'] || null,
+        website: tags['contact:website'] || tags['website'] || null,
+        email: tags['contact:email'] || tags['email'] || null,
       },
-      images: [images[formatted.length % images.length]],
+      images: images.length > 0 ? [images[formatted.length % images.length]] : [],
       source: 'osm',
-      isVerified: true,
-      averageRating: 0,
+      isVerified: false, // Truthful: crowd-sourced OSM data is not platform verified
+      averageRating: null, // Truthful: ratings are unknown for raw OSM items
       totalReviews: 0,
       distance: dist,
       distanceFormatted: formatDistance(dist),
-      priceRange: '$$',
+      priceRange: null, // Truthful: price info unavailable in basic OSM tags
       isFeatured: false,
     });
 

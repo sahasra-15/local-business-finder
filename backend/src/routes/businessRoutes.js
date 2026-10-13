@@ -25,6 +25,7 @@ const router = Router();
 router.get('/categories', getCategories);
 router.get('/nearby', getNearbyBusinesses);
 router.get('/live-discover', discoverLivePlaces);
+router.get('/live-places', discoverLivePlaces);
 router.get('/', optionalAuth, getBusinesses);
 router.get('/my-listings', protect, authorize('business_owner', 'admin'), getMyBusinesses);
 router.get('/:id', optionalAuth, getBusinessById);

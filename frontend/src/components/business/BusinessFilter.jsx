@@ -1,5 +1,5 @@
 import { Search, Navigation, Filter, RotateCcw, LayoutGrid, List, MapPin, Globe, Sparkles, CheckCircle2 } from 'lucide-react';
-import { CATEGORIES, CITIES_AND_REGIONS, ALL_LOCALITIES, HYDERABAD_ZONES } from '../../utils/constants';
+import { PRIMARY_CATEGORIES, CITIES_AND_REGIONS, ALL_LOCALITIES, HYDERABAD_ZONES } from '../../utils/constants';
 import Button from '../common/Button';
 import { useState } from 'react';
 
@@ -60,7 +60,7 @@ export default function BusinessFilter({
             className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition cursor-pointer"
           >
             <option value="All">All Categories</option>
-            {CATEGORIES.map((cat) => (
+            {PRIMARY_CATEGORIES.map((cat) => (
               <option key={cat.name} value={cat.name}>
                 {cat.name}
               </option>
@@ -236,6 +236,7 @@ export default function BusinessFilter({
             >
               <option value="nearest">Nearest First</option>
               <option value="rating">Highest Rated</option>
+              <option value="name">Name A–Z</option>
               <option value="reviews">Most Reviewed</option>
               <option value="newest">Recently Added</option>
             </select>

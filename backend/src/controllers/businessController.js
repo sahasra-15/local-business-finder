@@ -5,6 +5,10 @@ import { successResponse, errorResponse } from '../utils/response.js';
 import { calculateDistance, formatDistance } from '../services/distanceService.js';
 import { fetchOsmPlaces, syncPlacesToDatabase, resolveLocalityCoords } from '../services/placesService.js';
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export const getBusinesses = async (req, res, next) => {
   try {
     const {
@@ -12,30 +16,37 @@ export const getBusinesses = async (req, res, next) => {
       category,
       minRating,
       priceRange,
-      sort = 'newest',
+      sort = 'nearest',
       page = 1,
       limit = 12,
       lat,
       lng,
       locality,
+      radius,
+      verified,
       featured,
     } = req.query;
 
-    const query = { status: 'approved' };
+    const andConditions = [{ status: 'approved' }];
 
-    // Search filter across name, description, and locality
+    // 1. Search filter: search name, category, description, street, locality, city, services
     if (search && search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i');
-      query.$or = [
-        { name: searchRegex },
-        { description: searchRegex },
-        { 'address.locality': searchRegex },
-        { 'address.city': searchRegex },
-        { services: { $in: [searchRegex] } },
-      ];
+      const escaped = escapeRegex(search.trim());
+      const searchRegex = new RegExp(escaped, 'i');
+      andConditions.push({
+        $or: [
+          { name: searchRegex },
+          { category: searchRegex },
+          { description: searchRegex },
+          { 'address.locality': searchRegex },
+          { 'address.street': searchRegex },
+          { 'address.city': searchRegex },
+          { services: { $in: [searchRegex] } },
+        ],
+      });
     }
 
-    // Category filter with bidirectional alias matching
+    // 2. Category filter with bidirectional aliases
     if (category && category !== 'All' && category !== 'all') {
       const CATEGORY_ALIASES = {
         'Supermarkets & Grocery Stores': ['Supermarkets & Grocery Stores', 'Grocery Stores and Supermarkets'],
@@ -61,150 +72,144 @@ export const getBusinesses = async (req, res, next) => {
         'IT Companies, Tech Firms & Coworking': ['IT Companies, Tech Firms & Coworking', 'Professional Services'],
         'Professional Services': ['IT Companies, Tech Firms & Coworking', 'Professional Services'],
       };
-
-      const matchedCategories = CATEGORY_ALIASES[category] || [category];
-      query.category = { $in: matchedCategories };
+      const matched = CATEGORY_ALIASES[category] || [category];
+      andConditions.push({ category: { $in: matched } });
     }
 
-    // Locality or City filter (supports "All", "All Locations", "All Hyderabad")
-    if (
-      locality &&
-      locality.trim() &&
-      locality !== 'All' &&
-      locality !== 'All Locations' &&
-      locality !== 'All Hyderabad' &&
-      locality !== 'All Hyderabad Localities' &&
-      locality !== 'All Hyderabad (All Zones)' &&
-      locality !== 'All Zones'
-    ) {
-      const locRegex = new RegExp(locality.trim(), 'i');
-      const localityCondition = {
+    // 3. Locality filter: ignore citywide selections
+    const isCitywideLocality =
+      !locality ||
+      !locality.trim() ||
+      ['all', 'all locations', 'all hyderabad', 'all hyderabad localities', 'all hyderabad (all zones)', 'all zones'].includes(
+        locality.trim().toLowerCase()
+      );
+
+    if (!isCitywideLocality) {
+      const locEscaped = escapeRegex(locality.trim());
+      const locRegex = new RegExp(locEscaped, 'i');
+      andConditions.push({
         $or: [
           { 'address.locality': locRegex },
           { 'address.street': locRegex },
           { 'address.city': locRegex },
-          { 'address.state': locRegex },
         ],
-      };
+      });
+    }
 
-      if (query.$or) {
-        query.$and = [{ $or: query.$or }, localityCondition];
-        delete query.$or;
-      } else {
-        query.$or = localityCondition.$or;
+    // 4. Verified filter
+    if (verified === 'true') {
+      andConditions.push({ isVerified: true });
+    }
+
+    // 5. Min rating filter
+    if (minRating && !isNaN(Number(minRating))) {
+      andConditions.push({
+        averageRating: { $gte: Number(minRating) },
+      });
+    }
+
+    // 6. Price range filter
+    if (priceRange && priceRange.trim()) {
+      andConditions.push({ priceRange: priceRange.trim() });
+    }
+
+    // 7. Featured filter
+    if (featured === 'true') {
+      andConditions.push({ isFeatured: true });
+    }
+
+    const query = andConditions.length > 1 ? { $and: andConditions } : andConditions[0];
+
+    // Reference coordinates for distance & radius calculations:
+    let refLat = lat !== undefined && lat !== null && lat !== '' ? parseFloat(lat) : null;
+    let refLng = lng !== undefined && lng !== null && lng !== '' ? parseFloat(lng) : null;
+
+    if ((refLat === null || refLng === null || isNaN(refLat) || isNaN(refLng)) && !isCitywideLocality) {
+      const resolved = resolveLocalityCoords(locality);
+      if (resolved) {
+        refLat = resolved.lat;
+        refLng = resolved.lng;
       }
     }
 
-    // Source / Verified filter
-    if (req.query.source) {
-      query.source = req.query.source;
-    }
-    if (req.query.verified === 'true') {
-      query.isVerified = true;
+    const hasRefCoords = refLat !== null && refLng !== null && !isNaN(refLat) && !isNaN(refLng);
+
+    // Fetch matching businesses
+    let matchingBusinesses = await Business.find(query).lean();
+
+    // Attach accurate Haversine distance
+    matchingBusinesses = matchingBusinesses.map((b) => {
+      let dist = null;
+      if (hasRefCoords && b.location?.coordinates && b.location.coordinates.length === 2) {
+        const [bLng, bLat] = b.location.coordinates;
+        if (!isNaN(bLat) && !isNaN(bLng)) {
+          dist = calculateDistance(refLat, refLng, bLat, bLng);
+        }
+      }
+      return {
+        ...b,
+        distance: dist,
+        distanceFormatted: dist !== null ? formatDistance(dist) : null,
+      };
+    });
+
+    // 8. Radius filter: Strictly filter within radius if requested and reference coordinates exist
+    const radiusNum = radius ? parseFloat(radius) : null;
+    if (radiusNum !== null && !isNaN(radiusNum) && radiusNum > 0 && hasRefCoords) {
+      if (!isCitywideLocality || (lat && lng)) {
+        matchingBusinesses = matchingBusinesses.filter(
+          (b) => b.distance !== null && b.distance <= radiusNum
+        );
+      }
     }
 
-    // Rating filter
-    if (minRating && !isNaN(Number(minRating))) {
-      query.averageRating = { $gte: Number(minRating) };
-    }
-
-    // Price range filter
-    if (priceRange) {
-      query.priceRange = priceRange;
-    }
-
-    // Featured filter
-    if (featured === 'true') {
-      query.isFeatured = true;
-    }
-
-    // Sorting definition
-    let sortOptions = { createdAt: -1 };
-    if (sort === 'rating') {
-      sortOptions = { averageRating: -1, totalReviews: -1 };
+    // 9. Deterministic sorting
+    if (sort === 'nearest') {
+      matchingBusinesses.sort((a, b) => {
+        if (a.distance === null && b.distance === null) return a.name.localeCompare(b.name);
+        if (a.distance === null) return 1;
+        if (b.distance === null) return -1;
+        if (a.distance !== b.distance) return a.distance - b.distance;
+        return a.name.localeCompare(b.name);
+      });
+    } else if (sort === 'rating') {
+      matchingBusinesses.sort((a, b) => {
+        const rA = a.averageRating ?? -1;
+        const rB = b.averageRating ?? -1;
+        if (rB !== rA) return rB - rA;
+        const revA = a.totalReviews ?? 0;
+        const revB = b.totalReviews ?? 0;
+        if (revB !== revA) return revB - revA;
+        return a.name.localeCompare(b.name);
+      });
     } else if (sort === 'reviews') {
-      sortOptions = { totalReviews: -1, averageRating: -1 };
+      matchingBusinesses.sort((a, b) => {
+        const revA = a.totalReviews ?? 0;
+        const revB = b.totalReviews ?? 0;
+        if (revB !== revA) return revB - revA;
+        return (b.averageRating ?? 0) - (a.averageRating ?? 0);
+      });
     } else if (sort === 'name') {
-      sortOptions = { name: 1 };
+      matchingBusinesses.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
     } else if (sort === 'newest') {
-      sortOptions = { createdAt: -1 };
+      matchingBusinesses.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     }
 
+    const totalCount = matchingBusinesses.length;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 12));
     const skip = (pageNum - 1) * limitNum;
-
-    const totalCount = await Business.countDocuments(query);
-    let businesses = await Business.find(query)
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limitNum)
-      .lean();
-
-    // Attach distances if coordinates provided or resolved from locality
-    let userLat = lat ? parseFloat(lat) : null;
-    let userLng = lng ? parseFloat(lng) : null;
-
-    if ((userLat === null || userLng === null) && locality) {
-      const resolved = resolveLocalityCoords(locality);
-      if (resolved) {
-        userLat = resolved.lat;
-        userLng = resolved.lng;
-      }
-    }
-
-    if (userLat !== null && userLng !== null && !isNaN(userLat) && !isNaN(userLng)) {
-      businesses = businesses.map((b) => {
-        const [bLng, bLat] = b.location?.coordinates || [78.4878, 17.5878];
-        const dist = calculateDistance(userLat, userLng, bLat, bLng);
-        return {
-          ...b,
-          distance: dist,
-          distanceFormatted: formatDistance(dist),
-        };
-      });
-
-      // If user selected a specific locality and fewer than 4 businesses matched exactly,
-      // expand search to nearby businesses within 15km in the same region
-      if (locality && businesses.length < 4) {
-        const existingIds = new Set(businesses.map((b) => b._id.toString()));
-        const nearbyQuery = {
-          status: 'approved',
-          _id: { $nin: Array.from(existingIds) },
-        };
-        if (category && category !== 'All' && category !== 'all') {
-          nearbyQuery.category = category;
-        }
-        const nearbyPool = await Business.find(nearbyQuery).limit(40).lean();
-        const nearbyCandidates = nearbyPool
-          .map((b) => {
-            const [bLng, bLat] = b.location?.coordinates || [78.4878, 17.5878];
-            const dist = calculateDistance(userLat, userLng, bLat, bLng);
-            return {
-              ...b,
-              distance: dist,
-              distanceFormatted: formatDistance(dist),
-            };
-          })
-          .filter((b) => b.distance <= 15) // within 15 km of that locality
-          .sort((a, b) => a.distance - b.distance);
-
-        const needed = 8 - businesses.length;
-        businesses = [...businesses, ...nearbyCandidates.slice(0, needed)];
-      }
-
-      if (sort === 'nearest') {
-        businesses.sort((a, b) => (a.distance ?? 999999) - (b.distance ?? 999999));
-      }
-    }
+    const paginatedBusinesses = matchingBusinesses.slice(skip, skip + limitNum);
 
     return successResponse(
       res,
       {
-        businesses,
+        businesses: paginatedBusinesses,
         pagination: {
           currentPage: pageNum,
-          totalPages: Math.ceil(totalCount / limitNum),
+          totalPages: Math.max(1, Math.ceil(totalCount / limitNum)),
           totalCount,
           limit: limitNum,
         },
@@ -442,14 +447,14 @@ export const getCategories = async (req, res, next) => {
 
 export const discoverLivePlaces = async (req, res, next) => {
   try {
-    const { locality, lat, lng, radius = 5, category, limit = 30 } = req.query;
+    const { locality, lat, lng, radius = 5, category, search, limit = 30 } = req.query;
 
     let targetLat = lat ? parseFloat(lat) : null;
     let targetLng = lng ? parseFloat(lng) : null;
     let targetLocality = locality || 'Hyderabad';
 
     // If locality provided without lat/lng, resolve via coordinates dictionary
-    if ((targetLat === null || targetLng === null) && locality) {
+    if ((targetLat === null || targetLng === null || isNaN(targetLat) || isNaN(targetLng)) && locality) {
       const resolved = resolveLocalityCoords(locality);
       if (resolved) {
         targetLat = resolved.lat;
@@ -459,63 +464,35 @@ export const discoverLivePlaces = async (req, res, next) => {
         targetLat = 17.4480;
         targetLng = 78.3800;
       }
-    } else if (targetLat === null || targetLng === null) {
+    } else if (targetLat === null || targetLng === null || isNaN(targetLat) || isNaN(targetLng)) {
       targetLat = 17.4480;
       targetLng = 78.3800;
     }
 
     const radiusMeters = (parseFloat(radius) || 5) * 1000;
-    let places = await fetchOsmPlaces({
+    const places = await fetchOsmPlaces({
       lat: targetLat,
       lng: targetLng,
       radiusMeters,
       category: category && category !== 'All' ? category : null,
+      search: search && search.trim() ? search.trim() : null,
       limit: parseInt(limit, 10) || 30,
       localityName: targetLocality,
     });
 
-    // Resilient fallback: If live Overpass returns 0 (e.g. offline, rate-limited, local proxy),
-    // return verified real records seeded for this locality from MongoDB
-    if (!places || places.length === 0) {
-      const escapedLocality = targetLocality.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const fallbackQuery = {
-        status: 'approved',
-        $or: [
-          { 'address.locality': new RegExp(escapedLocality, 'i') },
-          { 'address.street': new RegExp(escapedLocality, 'i') },
-          { 'address.city': 'Hyderabad' },
-        ],
-      };
-      if (category && category !== 'All') {
-        fallbackQuery.category = category;
-      }
-      const dbPlaces = await Business.find(fallbackQuery)
-        .limit(parseInt(limit, 10) || 30)
-        .lean();
-
-      places = dbPlaces.map((b) => {
-        const [bLng, bLat] = b.location?.coordinates || [78.4878, 17.5878];
-        const dist = calculateDistance(targetLat, targetLng, bLat, bLng);
-        return {
-          ...b,
-          id: b._id,
-          distance: dist,
-          distanceFormatted: formatDistance(dist),
-          source: b.source || 'osm',
-          isVerified: true,
-        };
-      });
-    }
+    const safePlaces = Array.isArray(places) ? places : [];
 
     return successResponse(
       res,
       {
-        places,
-        count: places.length,
+        places: safePlaces,
+        count: safePlaces.length,
         center: { lat: targetLat, lng: targetLng, locality: targetLocality },
         source: 'OpenStreetMap Overpass API (Live Real-World Data)',
       },
-      `Discovered ${places.length} verified real places in ${targetLocality}`
+      safePlaces.length > 0
+        ? `Discovered ${safePlaces.length} real places in ${targetLocality}`
+        : `No real-world places found in ${targetLocality} for the selected criteria`
     );
   } catch (err) {
     next(err);

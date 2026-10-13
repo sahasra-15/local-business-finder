@@ -58,10 +58,31 @@ export const LocationProvider = ({ children }) => {
 
   // Select preset locality or custom coordinate object
   const selectLocality = (locality) => {
+    if (
+      !locality ||
+      locality === 'All' ||
+      locality === 'All Hyderabad' ||
+      locality === 'All Hyderabad (All Zones)' ||
+      locality === 'All Locations'
+    ) {
+      setCoordinates({
+        lat: DEFAULT_COORDINATES.lat,
+        lng: DEFAULT_COORDINATES.lng,
+      });
+      setLocalityName('All Hyderabad (All Zones)');
+      setIsGPSActive(false);
+      setGeoError(null);
+      return;
+    }
+
     if (typeof locality === 'string') {
+      const cleanLoc = locality.trim().toLowerCase();
       const found = ALL_LOCALITIES.find(
-        (loc) => loc.name.toLowerCase() === locality.toLowerCase() ||
-                 loc.fullName?.toLowerCase() === locality.toLowerCase()
+        (loc) =>
+          loc.name.toLowerCase() === cleanLoc ||
+          loc.fullName?.toLowerCase() === cleanLoc ||
+          cleanLoc.includes(loc.name.toLowerCase()) ||
+          loc.name.toLowerCase().includes(cleanLoc)
       );
       if (found) {
         setCoordinates({ lat: found.lat, lng: found.lng });

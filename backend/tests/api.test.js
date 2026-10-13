@@ -83,6 +83,80 @@ beforeAll(async () => {
     });
   userToken = uRes.body.data.token;
   userId = uRes.body.data.user.id;
+
+  // Seed distinct test businesses for search/filter testing
+  await Business.create([
+    {
+      name: 'Medchal Organic Supermarket',
+      description: 'Fresh organic vegetables, fruits, and cold pressed oils in Medchal town.',
+      category: 'Supermarkets & Grocery Stores',
+      address: { street: 'Main NH 44', locality: 'Medchal', city: 'Hyderabad', state: 'Telangana', postalCode: '501401' },
+      location: { type: 'Point', coordinates: [78.4814, 17.6297] },
+      contact: { phone: '+91 91111 22221' },
+      owner: owner1Id,
+      status: 'approved',
+      isVerified: true,
+      averageRating: 4.8,
+      totalReviews: 24,
+      priceRange: '$$',
+    },
+    {
+      name: 'Kandlakoya Tech Innovations',
+      description: 'Cloud and software consultancy hub inside Kandlakoya IT Park.',
+      category: 'IT Companies, Tech Firms & Coworking',
+      address: { street: 'Gateway IT Road', locality: 'Kandlakoya', city: 'Hyderabad', state: 'Telangana', postalCode: '501401' },
+      location: { type: 'Point', coordinates: [78.4878, 17.5878] },
+      contact: { phone: '+91 91111 22222' },
+      owner: owner2Id,
+      status: 'approved',
+      isVerified: false,
+      averageRating: 4.5,
+      totalReviews: 12,
+      priceRange: '$$$',
+    },
+    {
+      name: 'Medchal Biryani Hub',
+      description: 'Authentic Hyderabadi dum biryani and kebabs near Medchal bus station.',
+      category: 'Restaurants, Cafes & Food Outlets',
+      address: { street: 'Bus Stand Road', locality: 'Medchal', city: 'Hyderabad', state: 'Telangana', postalCode: '501401' },
+      location: { type: 'Point', coordinates: [78.4820, 17.6300] },
+      contact: { phone: '+91 91111 22223' },
+      owner: owner1Id,
+      status: 'approved',
+      isVerified: true,
+      averageRating: 3.5,
+      totalReviews: 8,
+      priceRange: '$',
+    },
+    {
+      name: 'Kompally Family Clinic',
+      description: 'Comprehensive family healthcare, outpatient care, and diagnostics in Kompally.',
+      category: 'Hospitals, Clinics & Diagnostic Labs',
+      address: { street: 'Near Cineplanet', locality: 'Kompally', city: 'Hyderabad', state: 'Telangana', postalCode: '500100' },
+      location: { type: 'Point', coordinates: [78.4852, 17.5385] },
+      contact: { phone: '+91 91111 22224' },
+      owner: owner2Id,
+      status: 'approved',
+      isVerified: true,
+      averageRating: 4.9,
+      totalReviews: 35,
+      priceRange: '$$',
+    },
+    {
+      name: 'Unrated Local Bakery',
+      description: 'Fresh milk bread and eggless cakes in Secunderabad.',
+      category: 'Restaurants, Cafes & Food Outlets',
+      address: { street: 'Clock Tower Road', locality: 'Secunderabad', city: 'Hyderabad', state: 'Telangana', postalCode: '500003' },
+      location: { type: 'Point', coordinates: [78.5000, 17.4410] },
+      contact: { phone: '+91 91111 22225' },
+      owner: owner1Id,
+      status: 'approved',
+      isVerified: false,
+      averageRating: 0,
+      totalReviews: 0,
+      priceRange: '$',
+    },
+  ]);
 });
 
 afterAll(async () => {
@@ -233,16 +307,95 @@ describe('4. Business Creation, Ownership & Management', () => {
 });
 
 describe('5. Search, Filters & Geospatial Queries', () => {
-  it('should search businesses by query string', async () => {
-    const res = await request(app).get('/api/businesses?search=Tiffin');
+  it('should search businesses by query string (partial & case-insensitive)', async () => {
+    const res = await request(app).get('/api/businesses?search=organic');
     expect(res.status).toBe(200);
     expect(res.body.data.businesses.length).toBeGreaterThan(0);
+    expect(res.body.data.businesses.some((b) => b.name === 'Medchal Organic Supermarket')).toBe(true);
   });
 
-  it('should filter businesses by category', async () => {
-    const res = await request(app).get('/api/businesses?category=Restaurants%20and%20Cafes');
+  it('should return empty list when no businesses match search query (no fake fallbacks)', async () => {
+    const res = await request(app).get('/api/businesses?search=NonExistentZzzzQuery12345');
     expect(res.status).toBe(200);
-    expect(res.body.data.businesses.length).toBeGreaterThan(0);
+    expect(res.body.data.businesses).toHaveLength(0);
+    expect(res.body.data.pagination.totalCount).toBe(0);
+  });
+
+  it('should filter businesses by category and aliases', async () => {
+    // Primary category name
+    const resPrimary = await request(app).get('/api/businesses?category=Supermarkets%20%26%20Grocery%20Stores');
+    expect(resPrimary.status).toBe(200);
+    expect(resPrimary.body.data.businesses.some((b) => b.name === 'Medchal Organic Supermarket')).toBe(true);
+
+    // Alias category name
+    const resAlias = await request(app).get('/api/businesses?category=Grocery%20Stores%20and%20Supermarkets');
+    expect(resAlias.status).toBe(200);
+    expect(resAlias.body.data.businesses.some((b) => b.name === 'Medchal Organic Supermarket')).toBe(true);
+  });
+
+  it('should filter businesses strictly by locality', async () => {
+    const res = await request(app).get('/api/businesses?locality=Medchal');
+    expect(res.status).toBe(200);
+    expect(res.body.data.businesses.length).toBeGreaterThanOrEqual(2);
+    // Every business returned must be in Medchal
+    expect(res.body.data.businesses.every((b) => b.address?.locality === 'Medchal')).toBe(true);
+  });
+
+  it('should filter businesses by Kandlakoya locality', async () => {
+    const res = await request(app).get('/api/businesses?locality=Kandlakoya');
+    expect(res.status).toBe(200);
+    expect(res.body.data.businesses.some((b) => b.name === 'Kandlakoya Tech Innovations')).toBe(true);
+    expect(res.body.data.businesses.every((b) => b.address?.locality === 'Kandlakoya')).toBe(true);
+  });
+
+  it('should combine category and locality filters correctly', async () => {
+    const res = await request(app).get('/api/businesses?locality=Medchal&category=Restaurants,%20Cafes%20%26%20Food%20Outlets');
+    expect(res.status).toBe(200);
+    expect(res.body.data.businesses.some((b) => b.name === 'Medchal Biryani Hub')).toBe(true);
+    expect(res.body.data.businesses.every((b) => b.address?.locality === 'Medchal')).toBe(true);
+  });
+
+  it('should filter by verified status only', async () => {
+    const resVerified = await request(app).get('/api/businesses?verified=true');
+    expect(resVerified.status).toBe(200);
+    expect(resVerified.body.data.businesses.every((b) => b.isVerified === true)).toBe(true);
+    expect(resVerified.body.data.businesses.some((b) => b.name === 'Kandlakoya Tech Innovations')).toBe(false);
+  });
+
+  it('should filter by minRating and priceRange', async () => {
+    const resRating = await request(app).get('/api/businesses?minRating=4');
+    expect(resRating.status).toBe(200);
+    expect(resRating.body.data.businesses.every((b) => b.averageRating >= 4)).toBe(true);
+    expect(resRating.body.data.businesses.some((b) => b.name === 'Medchal Biryani Hub')).toBe(false);
+
+    const resPrice = await request(app).get('/api/businesses?priceRange=%24%24%24');
+    expect(resPrice.status).toBe(200);
+    expect(resPrice.body.data.businesses.every((b) => b.priceRange === '$$$')).toBe(true);
+  });
+
+  it('should filter by coordinates and radius strictly', async () => {
+    // Medchal coordinates: 17.6297, 78.4814 with radius of 2km
+    const res = await request(app).get('/api/businesses?lat=17.6297&lng=78.4814&radius=2');
+    expect(res.status).toBe(200);
+    expect(res.body.data.businesses.some((b) => b.name === 'Medchal Organic Supermarket')).toBe(true);
+    expect(res.body.data.businesses.some((b) => b.name === 'Kompally Family Clinic')).toBe(false);
+    expect(res.body.data.businesses.some((b) => b.name === 'Unrated Local Bakery')).toBe(false);
+  });
+
+  it('should sort businesses by rating, name, and reviews', async () => {
+    const resRating = await request(app).get('/api/businesses?sort=rating');
+    expect(resRating.status).toBe(200);
+    const ratings = resRating.body.data.businesses.map((b) => b.averageRating || 0);
+    for (let i = 0; i < ratings.length - 1; i++) {
+      expect(ratings[i]).toBeGreaterThanOrEqual(ratings[i + 1]);
+    }
+
+    const resName = await request(app).get('/api/businesses?sort=name');
+    expect(resName.status).toBe(200);
+    const names = resName.body.data.businesses.map((b) => b.name.toLowerCase());
+    for (let i = 0; i < names.length - 1; i++) {
+      expect(names[i].localeCompare(names[i + 1])).toBeLessThanOrEqual(0);
+    }
   });
 
   it('should reject invalid coordinates in nearby search', async () => {
@@ -252,9 +405,18 @@ describe('5. Search, Filters & Geospatial Queries', () => {
   });
 
   it('should return nearby businesses when valid coordinates provided', async () => {
-    const res = await request(app).get('/api/businesses/nearby?lat=17.478&lng=78.567&radius=10');
+    const res = await request(app).get('/api/businesses/nearby?lat=17.6297&lng=78.4814&radius=10');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.data.businesses)).toBe(true);
+    expect(res.body.data.businesses.length).toBeGreaterThan(0);
+  });
+
+  it('should return live-discover / live-places response with openstreetmap source', async () => {
+    const res = await request(app).get('/api/businesses/live-places?lat=17.6297&lng=78.4814&radius=2');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.source).toContain('OpenStreetMap');
+    expect(Array.isArray(res.body.data.places)).toBe(true);
   });
 });
 

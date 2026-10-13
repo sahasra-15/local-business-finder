@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Map, MapPin, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { businessService } from '../services/businessService';
 import { useLocation } from '../context/LocationContext';
+import { useToast } from '../context/ToastContext';
 import BusinessCard from '../components/business/BusinessCard';
 import BusinessFilter from '../components/business/BusinessFilter';
 import { BusinessCardSkeleton } from '../components/common/Skeleton';
@@ -34,8 +35,17 @@ export default function ExplorePage() {
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalCount: 0 });
   const [loading, setLoading] = useState(true);
   const [selectedMapBusiness, setSelectedMapBusiness] = useState(null);
-  const [isDiscovering, setIsDiscovering] = useState(false);
-  const [livePlacesActive, setLivePlacesActive] = useState(false);
+  const toast = useToast();
+  const activeRequestIdRef = useRef(0);
+  const [debouncedSearch, setDebouncedSearch] = useState(filters.search);
+
+  // Debounce search input by 250ms to prevent request flood and lag
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
 
   // Sync state changes to searchParams
   useEffect(() => {
@@ -54,12 +64,14 @@ export default function ExplorePage() {
 
   // Fetch businesses whenever filters or page or coordinates change
   useEffect(() => {
+    const currentReqId = ++activeRequestIdRef.current;
+
     const fetchBusinesses = async () => {
       setLoading(true);
       setLivePlacesActive(false);
       try {
         const queryParams = {
-          search: filters.search,
+          search: debouncedSearch,
           category: filters.category,
           locality: filters.locality,
           radius: filters.radius,
@@ -74,24 +86,43 @@ export default function ExplorePage() {
         };
 
         const res = await businessService.getBusinesses(queryParams);
-        setBusinesses(res.data.businesses || []);
-        setPagination(res.data.pagination || { currentPage: 1, totalPages: 1, totalCount: 0 });
+        // Only update state if this is the newest inflight request
+        if (currentReqId === activeRequestIdRef.current) {
+          setBusinesses(res.data.businesses || []);
+          setPagination(res.data.pagination || { currentPage: 1, totalPages: 1, totalCount: 0 });
+        }
       } catch (err) {
-        console.error('Failed to load explore businesses:', err);
+        if (currentReqId === activeRequestIdRef.current) {
+          console.error('Failed to load explore businesses:', err);
+          setBusinesses([]);
+        }
       } finally {
-        setLoading(false);
+        if (currentReqId === activeRequestIdRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     fetchBusinesses();
-  }, [filters, page, coordinates]);
+  }, [
+    debouncedSearch,
+    filters.category,
+    filters.locality,
+    filters.radius,
+    filters.minRating,
+    filters.priceRange,
+    filters.sort,
+    filters.verified,
+    page,
+    coordinates,
+  ]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(1); // Reset page on filter change
 
-    // If changing locality, update context coordinates
-    if (key === 'locality' && value) {
+    // Synchronize locality changes with LocationContext (including resets)
+    if (key === 'locality') {
       selectLocality(value);
     }
   };
@@ -107,8 +138,10 @@ export default function ExplorePage() {
       sort: 'nearest',
       verified: '',
     });
+    selectLocality('');
     setLivePlacesActive(false);
     setPage(1);
+    toast.info('All filters have been reset to default.');
   };
 
   const handleDiscoverLivePlaces = async () => {
@@ -117,6 +150,7 @@ export default function ExplorePage() {
       const res = await businessService.discoverLivePlaces({
         locality: filters.locality || localityName || 'Hyderabad',
         category: filters.category !== 'All' ? filters.category : undefined,
+        search: filters.search ? filters.search.trim() : undefined,
         lat: coordinates?.lat,
         lng: coordinates?.lng,
         radius: filters.radius || 5,
@@ -124,19 +158,26 @@ export default function ExplorePage() {
       });
 
       const livePlaces = res.data?.places || [];
-      if (livePlaces.length > 0) {
-        setBusinesses(livePlaces);
-        setLivePlacesActive(true);
-        setPagination({
-          currentPage: 1,
-          totalPages: 1,
-          totalCount: livePlaces.length,
-        });
+      setBusinesses(livePlaces);
+      setLivePlacesActive(true);
+      setPagination({
+        currentPage: 1,
+        totalPages: 1,
+        totalCount: livePlaces.length,
+      });
+
+      if (livePlaces.length === 0) {
+        toast.info(
+          `No OpenStreetMap real places found within ${filters.radius || 5} km for "${
+            filters.locality || localityName
+          }". Try expanding your search radius.`
+        );
       } else {
-        alert('No additional real-world places found for this search radius in OpenStreetMap.');
+        toast.success(`Discovered ${livePlaces.length} real places from OpenStreetMap!`);
       }
     } catch (err) {
       console.error('Failed to discover live OSM places:', err);
+      toast.error('OpenStreetMap service is temporarily unreachable. Please try again.');
     } finally {
       setIsDiscovering(false);
     }
@@ -294,7 +335,7 @@ export default function ExplorePage() {
                   onMouseEnter={() => showSplitMap && setSelectedMapBusiness(biz)}
                   className="transition"
                 >
-                  <BusinessCard business={biz} />
+                  <BusinessCard business={biz} viewMode={viewMode} />
                 </div>
               ))}
             </div>

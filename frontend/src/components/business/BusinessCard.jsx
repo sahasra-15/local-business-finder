@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { favoriteService } from '../../services/favoriteService';
 
-export default function BusinessCard({ business, initialIsFavorite = false, onFavoriteToggle = null }) {
+export default function BusinessCard({ business, initialIsFavorite = false, onFavoriteToggle = null, viewMode = 'grid' }) {
   const { isAuthenticated } = useAuth();
   const toast = useToast();
   const [isFavorite, setIsFavorite] = useState(initialIsFavorite);
@@ -51,10 +51,20 @@ export default function BusinessCard({ business, initialIsFavorite = false, onFa
 
   const imageSrc = getBusinessDisplayImage(business);
 
+  const isList = viewMode === 'list';
+
   return (
-    <div className="group bg-white rounded-2xl border border-slate-200 hover:border-slate-300 shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col h-full overflow-hidden">
+    <div
+      className={`group bg-white rounded-2xl border border-slate-200 hover:border-slate-300 shadow-xs hover:shadow-xl transition-all duration-300 overflow-hidden ${
+        isList ? 'flex flex-col sm:flex-row' : 'flex flex-col h-full'
+      }`}
+    >
       {/* Thumbnail and badges */}
-      <div className="relative h-50 w-full overflow-hidden bg-slate-100">
+      <div
+        className={`relative overflow-hidden bg-slate-100 shrink-0 ${
+          isList ? 'h-52 sm:h-auto sm:w-72' : 'h-50 w-full'
+        }`}
+      >
         <img
           src={imageSrc}
           alt={business.name}
@@ -118,7 +128,7 @@ export default function BusinessCard({ business, initialIsFavorite = false, onFa
       </div>
 
       {/* Content */}
-      <div className="p-5 flex-1 flex flex-col justify-between">
+      <div className={`p-5 flex-1 flex flex-col justify-between ${isList ? 'sm:p-6' : ''}`}>
         <div className="space-y-2">
           {/* Rating & Locality */}
           <div className="flex items-center justify-between">
@@ -132,7 +142,7 @@ export default function BusinessCard({ business, initialIsFavorite = false, onFa
             </span>
           </div>
 
-          {/* Business Title & Verification Badge */}
+          {/* Business Title */}
           <div className="flex items-start justify-between gap-1.5 pt-0.5">
             <Link
               to={`/business/${business._id}`}
@@ -142,12 +152,17 @@ export default function BusinessCard({ business, initialIsFavorite = false, onFa
             </Link>
           </div>
 
-          {/* Data Source Indicator */}
+          {/* Data Source & Truthful Verification Indicator */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            {business.source === 'osm' || business.isVerified ? (
+            {business.isVerified ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Verified Place (OSM)
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                ✓ Verified Listing
+              </span>
+            ) : business.source === 'osm' ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-200 text-[10px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
+                🌐 OpenStreetMap
               </span>
             ) : business.source === 'registered' ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold">
@@ -156,23 +171,42 @@ export default function BusinessCard({ business, initialIsFavorite = false, onFa
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium">
-                Demo Listing
+                Community Listing
               </span>
             )}
           </div>
 
-          {/* Locality & Address */}
+          {/* Locality & Street Address */}
           <p className="text-xs text-slate-500 flex items-center gap-1 line-clamp-1">
             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <span>
-              {business.address?.street}, {business.address?.locality}
+              {business.address?.street ? `${business.address.street}, ` : ''}{business.address?.locality || 'Hyderabad'}
             </span>
           </p>
 
           {/* Description */}
-          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed pt-1">
+          <p className={`text-xs text-slate-600 leading-relaxed pt-1 ${isList ? 'line-clamp-3' : 'line-clamp-2'}`}>
             {business.description}
           </p>
+
+          {/* Services Chips (shown prominently in list view) */}
+          {isList && business.services && business.services.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              {business.services.slice(0, 4).map((s, idx) => (
+                <span
+                  key={idx}
+                  className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium"
+                >
+                  {s}
+                </span>
+              ))}
+              {business.services.length > 4 && (
+                <span className="text-[10px] text-slate-400 self-center">
+                  +{business.services.length - 4} more
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer Actions */}
@@ -189,7 +223,7 @@ export default function BusinessCard({ business, initialIsFavorite = false, onFa
 
           <Link
             to={`/business/${business._id}`}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-teal-600 text-white text-xs font-semibold shadow-xs hover:shadow transition-all"
+            className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-teal-600 text-white text-xs font-semibold shadow-xs hover:shadow transition-all"
           >
             <span>View Details</span>
           </Link>
