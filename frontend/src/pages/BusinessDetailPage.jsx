@@ -29,6 +29,7 @@ import ReviewModal from '../components/review/ReviewModal';
 import InteractiveMap from '../components/map/InteractiveMap';
 import BusinessCard from '../components/business/BusinessCard';
 import Button from '../components/common/Button';
+import { BusinessDetailSkeleton } from '../components/common/Skeleton';
 import { addRecentlyViewed, getRecentlyViewed } from '../utils/recentViews';
 import { getBusinessDisplayImage, getCategoryFallbackImage, CATEGORY_IMAGE_POOLS } from '../utils/categoryImages';
 
