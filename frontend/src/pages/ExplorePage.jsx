@@ -34,6 +34,8 @@ export default function ExplorePage() {
   const [businesses, setBusinesses] = useState([]);
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalCount: 0 });
   const [loading, setLoading] = useState(true);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [livePlacesActive, setLivePlacesActive] = useState(false);
   const [selectedMapBusiness, setSelectedMapBusiness] = useState(null);
   const toast = useToast();
   const activeRequestIdRef = useRef(0);
