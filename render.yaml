@@ -1,22 +1,22 @@
 services:
+  # All-in-One Full-Stack Web Service (Serves React UI + Express API + OSM proxy)
   - type: web
-    name: local-business-finder-api
+    name: local-business-finder
     runtime: node
     plan: free
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: npm run build:frontend && cd backend && npm install
+    startCommand: node backend/src/server.js
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: USE_IN_MEMORY_DB_FALLBACK
-        value: "false"
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: MONGODB_URI
         sync: false
+      - key: USE_IN_MEMORY_DB_FALLBACK
+        value: "true"
       - key: CLIENT_URL
-        sync: false
+        value: "http://localhost:3000,https://*.vercel.app,https://*.onrender.com"
