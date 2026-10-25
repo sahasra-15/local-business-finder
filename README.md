@@ -4,6 +4,9 @@ A full-stack, commercial-grade web application built with **Node.js, Express, Mo
 
 The platform provides extensive coverage across **Medchal, Kandlakoya (including Kandlakoya IT Park), North Hyderabad, Cyberabad / West Hyderabad, Central Hyderabad & Secunderabad, East Hyderabad, and South Hyderabad**, empowering users to discover genuine local businesses, inspect interactive maps, filter by distance radius, explore categorized services, write reviews, and save favorites.
 
+> 🌐 **Live Production Website:** [https://local-business-finder-79nr.onrender.com](https://local-business-finder-79nr.onrender.com)
+
+[![Live Demo](https://img.shields.io/badge/Demo-Live%20on%20Render-success?style=for-the-badge&logo=render)](https://local-business-finder-79nr.onrender.com)
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/sahasra-15/local-business-finder)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/sahasra-15/local-business-finder)
 
